@@ -1,0 +1,36 @@
+#include <boost/container/small_vector.hpp>
+
+#include "input/api/Keyboard/KeyboardController.h"
+#include "WindowSystem.h"
+
+#if defined(CEMU_IOS)
+// implemented by the iOS frontend bridge (src/ios)
+void CemuIOS_GetAnalogState(glm::vec2& axis, glm::vec2& rotation, glm::vec2& trigger);
+#endif
+
+KeyboardController::KeyboardController()
+	: base_type("keyboard", "Keyboard")
+{
+	
+}
+
+std::string KeyboardController::get_button_name(uint64 button) const
+{
+	return WindowSystem::GetKeyCodeName(button);
+}
+
+ControllerState KeyboardController::raw_state()
+{
+	ControllerState result{};
+
+	if (WindowSystem::GetWindowInfo().debugger_focused)
+		return result;
+
+	boost::container::small_vector<uint32, 16> pressedKeys;
+	WindowSystem::GetWindowInfo().iter_keystates([&pressedKeys](const std::pair<const uint32, bool>& keyState) { if (keyState.second) pressedKeys.emplace_back(keyState.first); });
+	result.buttons.SetPressedButtons(pressedKeys);
+#if defined(CEMU_IOS)
+	CemuIOS_GetAnalogState(result.axis, result.rotation, result.trigger);
+#endif
+	return result;
+}

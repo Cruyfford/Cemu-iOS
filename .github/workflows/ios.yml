@@ -1,0 +1,123 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ios-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 300
+    env:
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg-cache
+      VCPKG_FEATURE_FLAGS: binarycaching
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Select Xcode
+        run: |
+          ls /Applications | grep -i xcode || true
+          XC=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          [ -z "$XC" ] && XC=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          echo "Using $XC"
+          sudo xcode-select -s "$XC/Contents/Developer"
+          xcodebuild -version
+
+      - name: Install tools
+        run: brew install ninja xcodegen ldid nasm automake libtool autoconf-archive
+
+      - name: vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: vcpkg-cache
+          key: vcpkg-ios-${{ hashFiles('vcpkg.json', 'ios/triplets/*') }}-${{ github.run_id }}
+          restore-keys: vcpkg-ios-${{ hashFiles('vcpkg.json', 'ios/triplets/*') }}-
+
+      - name: Configure Cemu core (iOS)
+        run: |
+          mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+          cmake -S . -B build-ios -G Ninja \
+            -DCEMU_IOS=ON \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=OFF \
+            -DVCPKG_TARGET_TRIPLET=arm64-ios-cemu \
+            -DVCPKG_OVERLAY_TRIPLETS="$PWD/ios/triplets" \
+            -DVCPKG_INSTALL_OPTIONS="--x-buildtrees-root=$PWD/vcpkg-bt" \
+            -DEMULATOR_VERSION_MAJOR=2 -DEMULATOR_VERSION_MINOR=6 \
+            || { find vcpkg-bt -name '*.log' -newer vcpkg.json -exec sh -c 'echo "== $1"; tail -60 "$1"' _ {} \; 2>/dev/null | tail -400; exit 1; }
+
+      - name: Build Cemu core
+        run: cmake --build build-ios --target CemuIOSCore -- -k 0 2>&1 | tee build-core.log | grep -E "error|warning: unused" -A3 | head -400; test ${PIPESTATUS[0]} -eq 0
+
+      - name: Upload core build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-core-log
+          path: build-core.log
+
+      - name: Merge static libraries
+        run: |
+          mkdir -p build-ios/merged
+          LIBS=$(find build-ios -name '*.a' -not -path '*/merged/*' -not -path '*/debug/*' -not -path '*/vcpkg_installed/*')
+          VLIBS=$(find build-ios/vcpkg_installed/arm64-ios-cemu/lib -maxdepth 1 -name '*.a')
+          echo "$LIBS $VLIBS" | tr ' ' '\n'
+          libtool -static -no_warning_for_no_symbols -o build-ios/merged/libCemuAll.a $LIBS $VLIBS
+          ls -lh build-ios/merged
+
+      - name: Bundle Cemu data
+        run: |
+          mkdir -p ios/App/Resources/CemuData
+          cp -R bin/gameProfiles bin/resources ios/App/Resources/CemuData/
+
+      - name: Build app
+        run: |
+          cd ios/App
+          xcodegen generate
+          xcodebuild -project CemuiOS.xcodeproj -scheme CemuiOS -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build 2>&1 | tee ../../build-app.log | grep -E "error:|ld: |Undefined symbols|referenced from" -A2 | head -300
+          test ${PIPESTATUS[0]} -eq 0
+
+      - name: Upload app build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-app-log
+          path: build-app.log
+
+      - name: Package IPA
+        run: |
+          APP=ios/App/build/Build/Products/Release-iphoneos/Cemu.app
+          ldid -Sios/App/Resources/Cemu.entitlements "$APP/Cemu"
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry Cemu-iOS.ipa Payload
+          ls -lh Cemu-iOS.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Cemu-iOS
+          path: Cemu-iOS.ipa
+
+      - name: Publish nightly release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: Cemu iOS (nightly)
+          prerelease: true
+          body: "Unsigned IPA — install with SideStore/AltStore/TrollStore. Enable JIT with StikDebug. Built from ${{ github.sha }}."
+          files: Cemu-iOS.ipa
