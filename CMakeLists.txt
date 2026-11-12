@@ -121,6 +121,8 @@ if (CEMU_IOS)
 	set(ENABLE_SDL OFF CACHE BOOL "" FORCE) # controllers are handled by GameController.framework in the frontend
 	set(ALLOW_PORTABLE OFF CACHE BOOL "" FORCE)
 	add_compile_definitions(CEMU_IOS=1)
+	# iOS defaults executables to app bundles; helper tools in dependencies (e.g. zarchiveTool) must stay plain executables
+	set(CMAKE_MACOSX_BUNDLE OFF)
 	# BOOST_OS_MACOS is made true on iOS in src/Common/platform.h so the Darwin code paths are shared
 endif()
 
