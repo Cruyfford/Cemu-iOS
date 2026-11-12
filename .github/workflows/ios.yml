@@ -60,7 +60,13 @@ jobs:
             || { find vcpkg-bt -name '*.log' -newer vcpkg.json -exec sh -c 'echo "== $1"; tail -60 "$1"' _ {} \; 2>/dev/null | tail -400; exit 1; }
 
       - name: Build Cemu core
-        run: cmake --build build-ios --target CemuIOSCore -- -k 0 2>&1 | tee build-core.log | grep -E "error|warning: unused" -A3 | head -400; test ${PIPESTATUS[0]} -eq 0
+        run: |
+          set +e
+          cmake --build build-ios --target CemuIOSCore -- -k 0 > build-core.log 2>&1
+          rc=$?
+          grep -E "error:|fatal error" -A3 build-core.log | head -400
+          tail -30 build-core.log
+          exit $rc
 
       - name: Upload core build log
         if: failure()
@@ -85,12 +91,16 @@ jobs:
 
       - name: Build app
         run: |
+          set +e
           cd ios/App
           xcodegen generate
           xcodebuild -project CemuiOS.xcodeproj -scheme CemuiOS -configuration Release \
             -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build 2>&1 | tee ../../build-app.log | grep -E "error:|ld: |Undefined symbols|referenced from" -A2 | head -300
-          test ${PIPESTATUS[0]} -eq 0
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build > ../../build-app.log 2>&1
+          rc=$?
+          grep -E "error:|ld: |Undefined symbols|referenced from" -A2 ../../build-app.log | head -300
+          tail -20 ../../build-app.log
+          exit $rc
 
       - name: Upload app build log
         if: failure()
