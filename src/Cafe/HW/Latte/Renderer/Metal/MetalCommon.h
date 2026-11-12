@@ -107,7 +107,12 @@ inline bool FormatIsRenderable(Latte::E_GX2SURFFMT format)
 template <typename... T>
 inline bool executeCommand(fmt::format_string<T...> fmt, T&&... args) {
     std::string command = fmt::format(fmt, std::forward<T>(args)...);
+#if defined(CEMU_IOS)
+    // processes can't be spawned on iOS
+    int res = -1;
+#else
     int res = system(command.c_str());
+#endif
     if (res != 0)
     {
         cemuLog_log(LogType::Force, "command \"{}\" failed with exit code {}", command, res);
