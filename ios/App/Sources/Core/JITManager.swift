@@ -19,9 +19,16 @@ final class JITManager: ObservableObject {
     }
 
     @Published private(set) var state: State = .disabled
-    @AppStorage("jitMode") var jitMode: Int = 0          // 0 auto, 1 TXM, 2 legacy
-    @AppStorage("jitArenaMB") var arenaMB: Int = 512
-    @AppStorage("jitAutoRequest") var autoRequest: Bool = true
+    // 0 auto, 1 TXM, 2 legacy
+    @Published var jitMode: Int = UserDefaults.standard.object(forKey: "jitMode") as? Int ?? 0 {
+        didSet { UserDefaults.standard.set(jitMode, forKey: "jitMode") }
+    }
+    @Published var arenaMB: Int = UserDefaults.standard.object(forKey: "jitArenaMB") as? Int ?? 512 {
+        didSet { UserDefaults.standard.set(arenaMB, forKey: "jitArenaMB") }
+    }
+    @Published var autoRequest: Bool = UserDefaults.standard.object(forKey: "jitAutoRequest") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(autoRequest, forKey: "jitAutoRequest") }
+    }
 
     private var pollTask: Task<Void, Never>?
 

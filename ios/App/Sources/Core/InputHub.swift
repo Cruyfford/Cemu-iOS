@@ -9,7 +9,10 @@ final class InputHub: ObservableObject {
 
     @Published private(set) var controllerConnected = false
     @Published private(set) var controllerName: String?
-    @AppStorage("swapFaceButtons") var swapFaceButtons = false // false = Nintendo positional layout
+    // false = Nintendo positional layout
+    @Published var swapFaceButtons: Bool = UserDefaults.standard.bool(forKey: "swapFaceButtons") {
+        didSet { UserDefaults.standard.set(swapFaceButtons, forKey: "swapFaceButtons") }
+    }
 
     private var touchButtons = Set<UInt32>()
     private var padButtons = Set<UInt32>()
