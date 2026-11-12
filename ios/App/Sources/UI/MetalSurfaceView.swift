@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import QuartzCore
+import Metal
 
 /// A UIView backed by a CAMetalLayer that Cemu renders into.
 final class MetalSurfaceUIView: UIView {
