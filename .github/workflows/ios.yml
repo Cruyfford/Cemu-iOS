@@ -46,6 +46,7 @@ jobs:
       - name: Configure Cemu core (iOS)
         run: |
           mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+          set -o pipefail
           cmake -S . -B build-ios -G Ninja \
             -DCEMU_IOS=ON \
             -DCMAKE_SYSTEM_NAME=iOS \
@@ -56,8 +57,7 @@ jobs:
             -DVCPKG_TARGET_TRIPLET=arm64-ios-cemu \
             -DVCPKG_OVERLAY_TRIPLETS="$PWD/ios/triplets" \
             -DVCPKG_INSTALL_OPTIONS="--x-buildtrees-root=$PWD/vcpkg-bt" \
-            -DEMULATOR_VERSION_MAJOR=2 -DEMULATOR_VERSION_MINOR=6 \
-            || { find vcpkg-bt -name '*.log' -newer vcpkg.json -exec sh -c 'echo "== $1"; tail -60 "$1"' _ {} \; 2>/dev/null | tail -400; exit 1; }
+            -DEMULATOR_VERSION_MAJOR=2 -DEMULATOR_VERSION_MINOR=6 2>&1 | tee build-core.log
 
       - name: Build Cemu core
         run: |
@@ -68,12 +68,6 @@ jobs:
           tail -30 build-core.log
           exit $rc
 
-      - name: Upload core build log
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-core-log
-          path: build-core.log
 
       - name: Merge static libraries
         run: |
@@ -102,12 +96,24 @@ jobs:
           tail -20 ../../build-app.log
           exit $rc
 
-      - name: Upload app build log
+      - name: Publish logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        run: |
+          mkdir -p ci-logs
+          cp build-core.log build-app.log ci-logs/ 2>/dev/null || true
+          find build-ios vcpkg-bt -name 'CMakeError.log' -o -name 'CMakeConfigureLog.yaml' 2>/dev/null | head -5 | xargs -I{} cp {} ci-logs/ 2>/dev/null || true
+          find vcpkg-bt -name '*-err.log' -size +0 2>/dev/null | head -20 | while read f; do cp "$f" "ci-logs/$(echo $f | tr '/' '_')"; done
+          echo "${{ github.sha }}" > ci-logs/sha.txt
+          ls ci-logs
+
+      - name: Upload logs to ci-logs release
+        if: failure()
+        uses: softprops/action-gh-release@v2
         with:
-          name: build-app-log
-          path: build-app.log
+          tag_name: ci-logs
+          name: CI logs (latest failure)
+          prerelease: true
+          files: ci-logs/*
 
       - name: Package IPA
         run: |
