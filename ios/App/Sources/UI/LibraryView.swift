@@ -58,6 +58,7 @@ struct LibraryView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 26) {
                     HomeHeader()
+                    importBanner
                     statusPills
                     if core.games.isEmpty {
                         emptyState
@@ -234,6 +235,23 @@ struct LibraryView: View {
     // MARK: status
 
     @ViewBuilder
+    private var importBanner: some View {
+        if let progress = core.importProgress {
+            HStack(spacing: 12) {
+                Image(systemName: "archivebox.fill").foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Unpacking \(core.importName ?? "game")…").font(.subheadline.weight(.semibold)).lineLimit(1)
+                    ProgressView(value: progress)
+                }
+                Text("\(Int(progress * 100))%").font(.caption.weight(.bold)).monospacedDigit().foregroundStyle(.secondary)
+            }
+            .padding(14)
+            .glassSurface(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
+    }
+
+    @ViewBuilder
     private var statusPills: some View {
         if !core.hasKeys || !jit.isEnabled {
             GlassGroup(spacing: 10) {
@@ -288,7 +306,7 @@ struct LibraryView: View {
                     .symbolEffectBounce()
             }
             Text("Your library is empty").font(.title2.weight(.bold))
-            Text("Import .wua, .wux, .wud or .rpx files, or copy game folders to\nFiles › On My iPhone › Cemu › games.\nUpdates and DLC go in the same folder.")
+            Text("Import .zip, .wua, .wux, .wud or .rpx files, or copy game folders to\nFiles › On My iPhone › Cemu › games.\nUpdates and DLC go in the same folder.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -306,7 +324,7 @@ struct LibraryView: View {
     }
 
     static var gameTypes: [UTType] {
-        var types: [UTType] = [.folder, .data]
+        var types: [UTType] = [.folder, .zip, .data]
         for ext in ["wua", "wux", "wud", "rpx", "elf", "wuhb"] {
             if let t = UTType(filenameExtension: ext) { types.append(t) }
         }

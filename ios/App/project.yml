@@ -12,6 +12,10 @@ settings:
     ENABLE_BITCODE: "NO"
     CLANG_CXX_LANGUAGE_STANDARD: "c++20"
     CLANG_CXX_LIBRARY: "libc++"
+packages:
+  ZIPFoundation:
+    url: https://github.com/weichsel/ZIPFoundation
+    from: 0.9.19
 targets:
   CemuiOS:
     type: application
@@ -80,6 +84,7 @@ targets:
         ENABLE_TESTABILITY: "NO"
         SWIFT_OPTIMIZATION_LEVEL: "-O"
     dependencies:
+      - package: ZIPFoundation
       - sdk: Metal.framework
       - sdk: QuartzCore.framework
       - sdk: GameController.framework

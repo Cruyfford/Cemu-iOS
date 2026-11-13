@@ -123,6 +123,8 @@ final class EmulatorCore: ObservableObject {
 
     func refreshGames() {
         guard initialized else { return }
+        // fix raw NUS folders (no .app extensions, "tmd"/"cetk") that were copied in with Files
+        GameImporter.normalizeNUSFolders(in: gamesURL)
         CemuBridge_RefreshGameList()
         isScanning = true
         reloadGameList()
@@ -142,8 +144,14 @@ final class EmulatorCore: ObservableObject {
         return CemuBridge_ExtractIcon(game.titleIdValue, url.path) ? url : nil
     }
 
+    /// Import progress shown in the library while a zip is unpacked (nil when idle)
+    @Published var importProgress: Double?
+    @Published var importName: String?
+
     func importGames(_ urls: [URL]) {
+        var zips: [URL] = []
         for url in urls {
+            if url.pathExtension.lowercased() == "zip" { zips.append(url); continue }
             let scoped = url.startAccessingSecurityScopedResource()
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             let dest = gamesURL.appendingPathComponent(url.lastPathComponent)
@@ -159,7 +167,42 @@ final class EmulatorCore: ObservableObject {
                 errorMessage = "Import failed: \(error.localizedDescription)"
             }
         }
-        refreshGames()
+        if zips.isEmpty {
+            refreshGames()
+        } else {
+            unzipGames(zips)
+        }
+    }
+
+    private func unzipGames(_ zips: [URL]) {
+        let games = gamesURL
+        Task.detached(priority: .userInitiated) {
+            for zip in zips {
+                await MainActor.run {
+                    EmulatorCore.shared.importName = zip.deletingPathExtension().lastPathComponent
+                    EmulatorCore.shared.importProgress = 0
+                }
+                let scoped = zip.startAccessingSecurityScopedResource()
+                defer { if scoped { zip.stopAccessingSecurityScopedResource() } }
+                var lastReported = -1.0
+                do {
+                    _ = try GameImporter.unzip(zip, into: games) { fraction in
+                        guard fraction - lastReported >= 0.01 || fraction >= 1 else { return }
+                        lastReported = fraction
+                        Task { @MainActor in EmulatorCore.shared.importProgress = fraction }
+                    }
+                } catch {
+                    let msg = "Could not unpack \(zip.lastPathComponent): \(error.localizedDescription)"
+                    await MainActor.run { EmulatorCore.shared.errorMessage = msg }
+                }
+            }
+            await MainActor.run {
+                EmulatorCore.shared.importProgress = nil
+                EmulatorCore.shared.importName = nil
+                SoundManager.shared.play(.select)
+                EmulatorCore.shared.refreshGames()
+            }
+        }
     }
 
     func importKeys(from url: URL) {
