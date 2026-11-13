@@ -144,6 +144,10 @@ final class EmulatorCore: ObservableObject {
               let list = try? JSONDecoder().decode([GameEntry].self, from: data) else { return }
         let sorted = list.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         if sorted != games { games = sorted }
+        if !CemuBridge_IsScanning() {
+            let issues = GameImporter.findIssues(in: gamesURL, loadedPaths: sorted.map(\.path))
+            if issues != folderIssues { folderIssues = issues }
+        }
     }
 
     nonisolated func iconURL(for game: GameEntry) -> URL? {
@@ -151,6 +155,9 @@ final class EmulatorCore: ObservableObject {
         if FileManager.default.fileExists(atPath: url.path) { return url }
         return CemuBridge_ExtractIcon(game.titleIdValue, url.path) ? url : nil
     }
+
+    /// game folders that are in the games folder but could not be loaded
+    @Published private(set) var folderIssues: [GameImporter.FolderIssue] = []
 
     /// zips in the games folder that failed to unpack; not retried on every rescan
     var failedZips = Set<String>()

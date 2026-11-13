@@ -59,6 +59,7 @@ struct LibraryView: View {
                     HomeHeader()
                     importBanner
                     statusPills
+                    issuesList
                     if core.games.isEmpty {
                         emptyState
                     } else {
@@ -222,6 +223,26 @@ struct LibraryView: View {
     }
 
     // MARK: status
+
+    @ViewBuilder
+    private var issuesList: some View {
+        if !core.folderIssues.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Couldn't load", systemImage: "exclamationmark.triangle.fill")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.orange)
+                ForEach(core.folderIssues) { issue in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(issue.name).font(.subheadline.weight(.semibold)).lineLimit(2)
+                        Text(issue.reason).font(.caption).foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(14)
+            .glassSurface(RoundedRectangle(cornerRadius: 18, style: .continuous), tint: .orange.opacity(0.12))
+        }
+    }
 
     @ViewBuilder
     private var importBanner: some View {
