@@ -22,6 +22,9 @@ targets:
       - path: Resources/CemuData
         type: folder
         buildPhase: resources
+      - path: Resources/Sounds
+        type: folder
+        buildPhase: resources
     info:
       path: Resources/Info.plist
       properties:

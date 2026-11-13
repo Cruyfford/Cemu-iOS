@@ -3,18 +3,31 @@ import SwiftUI
 @main
 struct CemuApp: App {
     @StateObject private var core = EmulatorCore.shared
+    @AppStorage("appearance") private var appearance = 0
+    @AppStorage("accent") private var accentRaw = AppAccent.aqua.rawValue
+
+    private var scheme: ColorScheme? {
+        switch appearance {
+        case 1: return .light
+        case 2: return .dark
+        default: return nil
+        }
+    }
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(core)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(scheme)
+                .tint((AppAccent(rawValue: accentRaw) ?? .aqua).color)
         }
     }
 }
 
 struct RootView: View {
     @EnvironmentObject var core: EmulatorCore
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var tab = 0
     @AppStorage("screenMode") private var screenModeRaw = ScreenMode.tv.rawValue
     @State private var launching: GameEntry?
     @State private var showEmulation = false
@@ -23,8 +36,28 @@ struct RootView: View {
     @State private var pendingGame: GameEntry?
 
     var body: some View {
-        LibraryView(onLaunch: requestLaunch)
+        TabView(selection: $tab) {
+            LibraryView(onLaunch: requestLaunch)
+                .tabItem { Label("Library", systemImage: "square.grid.2x2.fill") }
+                .tag(0)
+            SettingsView()
+                .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+                .tag(1)
+        }
+            .minimizingTabBar()
+            .onChange(of: tab) { _ in
+                SoundManager.shared.play(.select)
+                Haptics.tap()
+            }
+            .onChange(of: scenePhase) { phase in
+                if phase == .active {
+                    if !showEmulation { SoundManager.shared.startMusic() }
+                } else if phase == .background {
+                    SoundManager.shared.enterBackground()
+                }
+            }
             .onAppear {
+                SoundManager.shared.startMusic()
                 core.start()
                 // JIT must be ready before the recompiler runs. If StikDebug already attached this
                 // prepares the arena right away, otherwise it asks StikDebug to attach.
@@ -33,10 +66,12 @@ struct RootView: View {
             .fullScreenCover(isPresented: $showEmulation, onDismiss: {
                 if core.runningGame != nil { core.stopGame() }
                 launching = nil
+                SoundManager.shared.resumeAfterGame()
             }) {
                 EmulationContainer(game: launching, onFailed: { msg in
                     showEmulation = false
                     launchError = msg
+                    SoundManager.shared.play(.error)
                 })
                 .environmentObject(core)
             }
@@ -70,6 +105,9 @@ struct RootView: View {
     private func startEmulation(_ game: GameEntry) {
         let mode = ScreenMode(rawValue: screenModeRaw) ?? .tv
         RenderSurfaces.shared.register(withGamePadScreen: mode == .tvWithGamePad)
+        SoundManager.shared.play(.launch)
+        Haptics.success()
+        SoundManager.shared.suspendForGame()
         launching = game
         showEmulation = true
     }

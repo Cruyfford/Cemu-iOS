@@ -174,6 +174,7 @@ final class EmulatorCore: ObservableObject {
     func deleteGame(_ game: GameEntry) {
         try? FileManager.default.removeItem(atPath: game.path)
         try? FileManager.default.removeItem(at: iconsURL.appendingPathComponent("\(game.titleId).tga"))
+        GameStats.shared.forget(game)
         refreshGames()
     }
 
@@ -186,10 +187,12 @@ final class EmulatorCore: ObservableObject {
             throw LaunchError.code(result)
         }
         runningGame = game
+        GameStats.shared.sessionStarted(game)
         UIApplication.shared.isIdleTimerDisabled = true
     }
 
     func stopGame() {
+        GameStats.shared.sessionEnded()
         CemuBridge_StopGame()
         runningGame = nil
         fps = 0
