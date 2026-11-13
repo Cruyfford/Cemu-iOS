@@ -127,8 +127,25 @@ final class ArtworkStore: ObservableObject {
             guard let url = core.iconURL(for: game), let img = TGAImage.load(url) else { return }
             let color = Self.dominantColor(of: img)
             await MainActor.run {
-                ArtworkStore.shared.art[game.titleId] = Art(image: img, color: color)
+                ArtworkStore.shared.enqueue(game.titleId, Art(image: img, color: color))
             }
+        }
+    }
+
+    // icons arrive one by one; publish them in batches so the grid redraws a few times, not once per icon
+    private var pending: [String: Art] = [:]
+    private var flushScheduled = false
+
+    fileprivate func enqueue(_ id: String, _ a: Art) {
+        pending[id] = a
+        guard !flushScheduled else { return }
+        flushScheduled = true
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            self.flushScheduled = false
+            guard !self.pending.isEmpty else { return }
+            self.art.merge(self.pending) { _, new in new }
+            self.pending.removeAll()
         }
     }
 

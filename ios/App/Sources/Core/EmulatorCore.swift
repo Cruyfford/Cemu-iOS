@@ -102,11 +102,13 @@ final class EmulatorCore: ObservableObject {
     }
 
     private func poll() {
+        // only publish real changes: every assignment to a @Published property redraws the whole UI
         let scanning = CemuBridge_IsScanning()
         if isScanning && !scanning { reloadGameList() }
-        isScanning = scanning
+        if scanning != isScanning { isScanning = scanning }
         if runningGame != nil {
-            fps = CemuBridge_GetFPS()
+            let newFPS = CemuBridge_GetFPS().rounded()
+            if newFPS != fps { fps = newFPS }
             if CemuBridge_ConsumeGameExitRequest() { stopGame() }
         }
         collectCoreError()
@@ -130,7 +132,8 @@ final class EmulatorCore: ObservableObject {
         let json = takeString(CemuBridge_GetGameListJSON())
         guard let data = json.data(using: .utf8),
               let list = try? JSONDecoder().decode([GameEntry].self, from: data) else { return }
-        games = list.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        let sorted = list.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        if sorted != games { games = sorted }
     }
 
     nonisolated func iconURL(for game: GameEntry) -> URL? {

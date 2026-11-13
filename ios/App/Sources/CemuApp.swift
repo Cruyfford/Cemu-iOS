@@ -66,6 +66,7 @@ struct RootView: View {
             .fullScreenCover(isPresented: $showEmulation, onDismiss: {
                 if core.runningGame != nil { core.stopGame() }
                 launching = nil
+                PlayState.shared.inGame = false
                 SoundManager.shared.resumeAfterGame()
             }) {
                 EmulationContainer(game: launching, onFailed: { msg in
@@ -108,6 +109,7 @@ struct RootView: View {
         SoundManager.shared.play(.launch)
         Haptics.success()
         SoundManager.shared.suspendForGame()
+        PlayState.shared.inGame = true
         launching = game
         showEmulation = true
     }

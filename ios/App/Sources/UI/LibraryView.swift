@@ -82,8 +82,9 @@ struct LibraryView: View {
                                 .padding(.horizontal, -20)
                             }
                         }
-                        section(search.isEmpty ? "All Games" : "Results", systemImage: "square.grid.2x2.fill", trailing: "\(sorted.count)") {
-                            if listMode { listContent } else { gridContent }
+                        let items = sorted
+                        section(search.isEmpty ? "All Games" : "Results", systemImage: "square.grid.2x2.fill", trailing: "\(items.count)") {
+                            if listMode { listContent(items) } else { gridContent(items) }
                         }
                     }
                 }
@@ -191,9 +192,9 @@ struct LibraryView: View {
         }
     }
 
-    private var gridContent: some View {
+    private func gridContent(_ items: [GameEntry]) -> some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 104 * tileSize, maximum: 170 * tileSize), spacing: 16)], spacing: 20) {
-            ForEach(sorted) { game in
+            ForEach(items) { game in
                 Button { open(game) } label: { GameCard(game: game) }
                     .buttonStyle(PressableStyle())
                     .zoomSource(game.id, zoom)
@@ -203,9 +204,9 @@ struct LibraryView: View {
         }
     }
 
-    private var listContent: some View {
-        VStack(spacing: 10) {
-            ForEach(sorted) { game in
+    private func listContent(_ items: [GameEntry]) -> some View {
+        LazyVStack(spacing: 10) {
+            ForEach(items) { game in
                 Button { open(game) } label: { GameRow(game: game, onPlay: { onLaunch(game) }) }
                     .buttonStyle(PressableStyle())
                     .zoomSource(game.id, zoom)
@@ -431,7 +432,6 @@ struct GameCard: View {
                             .padding(6)
                     }
                 }
-                .shadow(color: .black.opacity(0.18), radius: 10, y: 6)
             Text(game.name)
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(.primary)
