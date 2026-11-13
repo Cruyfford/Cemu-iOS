@@ -152,6 +152,8 @@ final class EmulatorCore: ObservableObject {
         var zips: [URL] = []
         for url in urls {
             if url.pathExtension.lowercased() == "zip" { zips.append(url); continue }
+            // already inside the games folder: nothing to copy, a rescan picks it up
+            if url.standardizedFileURL.path.hasPrefix(gamesURL.standardizedFileURL.path) { continue }
             let scoped = url.startAccessingSecurityScopedResource()
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             let dest = gamesURL.appendingPathComponent(url.lastPathComponent)
@@ -190,6 +192,10 @@ final class EmulatorCore: ObservableObject {
                         guard fraction - lastReported >= 0.01 || fraction >= 1 else { return }
                         lastReported = fraction
                         Task { @MainActor in EmulatorCore.shared.importProgress = fraction }
+                    }
+                    // a zip that sits in the app's own games folder is no longer needed once unpacked
+                    if zip.standardizedFileURL.deletingLastPathComponent().path == games.standardizedFileURL.path {
+                        try? FileManager.default.removeItem(at: zip)
                     }
                 } catch {
                     let msg = "Could not unpack \(zip.lastPathComponent): \(error.localizedDescription)"
