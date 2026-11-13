@@ -57,8 +57,10 @@ struct AnimatedBackground: View {
         ]
         let fieldAlpha = dark ? 0.30 : 0.22
         for (color, fx, fy, ph) in fields {
-            let c = CGPoint(x: w * (fx + 0.12 * sin(t * 0.07 + ph)), y: h * (fy + 0.10 * cos(t * 0.05 + ph * 1.3)))
-            let r = minSide * (0.75 + 0.08 * sin(t * 0.11 + ph))
+            let cx: Double = w * (fx + 0.12 * sin(t * 0.07 + ph))
+            let cy: Double = h * (fy + 0.10 * cos(t * 0.05 + ph * 1.3))
+            let c = CGPoint(x: cx, y: cy)
+            let r: Double = minSide * (0.75 + 0.08 * sin(t * 0.11 + ph))
             ctx.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)),
                      with: .radialGradient(Gradient(colors: [color.opacity(fieldAlpha), color.opacity(0)]),
                                            center: c, startRadius: 0, endRadius: r))
@@ -73,7 +75,9 @@ struct AnimatedBackground: View {
             p.move(to: CGPoint(x: 0, y: h))
             var x = 0.0
             while x <= w + 16 {
-                let y = baseY + amp * sin(x / w * .pi * 2 * (1.0 + Double(i) * 0.3) + t * speed + Double(i))
+                let freq: Double = (1.0 + Double(i) * 0.3) * 2 * Double.pi
+                let phase: Double = t * speed + Double(i)
+                let y: Double = baseY + amp * sin(x / w * freq + phase)
                 p.addLine(to: CGPoint(x: x, y: y))
                 x += 16
             }
@@ -87,9 +91,12 @@ struct AnimatedBackground: View {
         for b in Self.bubbles {
             let progress = (b.phase + t * b.speed).truncatingRemainder(dividingBy: 1)
             let y = h * (1.1 - progress * 1.25)
-            let x = w * (b.x + b.wobble * sin(t * 0.8 + b.phase * 10))
+            let wob: Double = b.wobble * sin(t * 0.8 + b.phase * 10)
+            let x: Double = w * (b.x + wob)
             let s = b.size * (0.6 + 0.4 * b.depth)
-            let fade = min(progress / 0.15, 1) * min((1 - progress) / 0.2, 1)
+            let fadeIn: Double = min(progress / 0.15, 1)
+            let fadeOut: Double = min((1 - progress) / 0.2, 1)
+            let fade: Double = fadeIn * fadeOut
             let alpha = bubbleAlpha * b.depth * fade
             let r = CGRect(x: x - s / 2, y: y - s / 2, width: s, height: s)
             ctx.fill(Path(ellipseIn: r), with: .color(accent.opacity(alpha * 0.25)))
