@@ -400,7 +400,7 @@ struct JITSettings: View {
 
 struct FilesSettings: View {
     @EnvironmentObject var core: EmulatorCore
-    @State private var showKeysImporter = false
+    @State private var importKind: ImportKind?
     @State private var editingKeys = false
     @State private var keysText = ""
 
@@ -410,7 +410,7 @@ struct FilesSettings: View {
                 LabeledContent("keys.txt") {
                     Chip(text: core.hasKeys ? "Found" : "Missing", tint: core.hasKeys ? .green : .orange)
                 }
-                Button { showKeysImporter = true } label: { Label("Import keys.txt", systemImage: "square.and.arrow.down") }
+                Button { importKind = .keys } label: { Label("Import keys.txt", systemImage: "square.and.arrow.down") }
                 Button {
                     keysText = (try? String(contentsOf: core.keysURL)) ?? ""
                     editingKeys = true
@@ -425,9 +425,7 @@ struct FilesSettings: View {
             }
         }
         .navigationTitle("Keys & Files")
-        .fileImporter(isPresented: $showKeysImporter, allowedContentTypes: [.plainText, .text, .data]) { result in
-            if case .success(let url) = result { core.importKeys(from: url); SoundManager.shared.play(.select) }
-        }
+        .importSheet($importKind)
         .sheet(isPresented: $editingKeys) {
             NavigationStack {
                 TextEditor(text: $keysText)

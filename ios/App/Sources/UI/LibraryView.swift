@@ -22,8 +22,7 @@ struct LibraryView: View {
     @AppStorage("librarySort") private var sortRaw = LibrarySort.recent.rawValue
     @AppStorage("libraryList") private var listMode = false
     @AppStorage("tileSize") private var tileSize = 1.0
-    @State private var showImporter = false
-    @State private var showKeysImporter = false
+    @State private var importKind: ImportKind?
     @State private var search = ""
     @State private var pendingDelete: GameEntry?
     @State private var path: [GameEntry] = []
@@ -105,12 +104,6 @@ struct LibraryView: View {
                 GameDetailView(game: game, onPlay: { onLaunch(game) }, onDelete: { pendingDelete = game })
                     .zoomDestination(game.id, zoom)
             }
-            .fileImporter(isPresented: $showImporter, allowedContentTypes: Self.gameTypes, allowsMultipleSelection: true) { result in
-                if case .success(let urls) = result {
-                    SoundManager.shared.play(.open)
-                    core.importGames(urls)
-                }
-            }
             .alert("Delete \(pendingDelete?.name ?? "")?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })) {
                 Button("Delete", role: .destructive) {
                     if let g = pendingDelete {
@@ -124,11 +117,7 @@ struct LibraryView: View {
                 Text("The game files are removed from the games folder.")
             }
         }
-        .background(
-            Color.clear.fileImporter(isPresented: $showKeysImporter, allowedContentTypes: [.plainText, .text, .data]) { result in
-                if case .success(let url) = result { core.importKeys(from: url); SoundManager.shared.play(.select) }
-            }
-        )
+        .importSheet($importKind)
     }
 
     private func open(_ game: GameEntry) {
@@ -170,8 +159,8 @@ struct LibraryView: View {
             .onChange(of: listMode) { _ in SoundManager.shared.play(.toggle) }
 
             Menu {
-                Button { showImporter = true } label: { Label("Import games", systemImage: "square.and.arrow.down") }
-                Button { showKeysImporter = true } label: { Label("Import keys.txt", systemImage: "key") }
+                Button { importKind = .games } label: { Label("Import games", systemImage: "square.and.arrow.down") }
+                Button { importKind = .keys } label: { Label("Import keys.txt", systemImage: "key") }
                 Button { core.refreshGames() } label: { Label("Rescan library", systemImage: "arrow.clockwise") }
             } label: {
                 Image(systemName: "plus")
@@ -277,7 +266,7 @@ struct LibraryView: View {
                         .buttonStyle(.plain)
                     }
                     if !core.hasKeys {
-                        SoundButton(effect: .select, action: { showKeysImporter = true }) {
+                        SoundButton(effect: .select, action: { importKind = .keys }) {
                             HStack(spacing: 8) {
                                 Image(systemName: "key.fill").foregroundStyle(.orange)
                                 VStack(alignment: .leading, spacing: 1) {
@@ -310,7 +299,7 @@ struct LibraryView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            SoundButton(effect: .open, action: { showImporter = true }) {
+            SoundButton(effect: .open, action: { importKind = .games }) {
                 Label("Import Games", systemImage: "square.and.arrow.down")
                     .font(.headline)
                     .padding(.horizontal, 10).padding(.vertical, 4)

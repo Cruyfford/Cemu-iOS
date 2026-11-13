@@ -125,6 +125,13 @@ final class EmulatorCore: ObservableObject {
         guard initialized else { return }
         // fix raw NUS folders (no .app extensions, "tmd"/"cetk") that were copied in with Files
         GameImporter.normalizeNUSFolders(in: gamesURL)
+        // zips copied straight into the games folder get unpacked, unless they were unpacked already
+        if importProgress == nil,
+           let items = try? FileManager.default.contentsOfDirectory(at: gamesURL, includingPropertiesForKeys: nil) {
+            let zips = items.filter { $0.pathExtension.lowercased() == "zip" }
+                .filter { !FileManager.default.fileExists(atPath: gamesURL.appendingPathComponent($0.deletingPathExtension().lastPathComponent).path) }
+            if !zips.isEmpty { unzipGames(zips) }
+        }
         CemuBridge_RefreshGameList()
         isScanning = true
         reloadGameList()
