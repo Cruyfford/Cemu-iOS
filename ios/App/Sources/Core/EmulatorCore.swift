@@ -130,6 +130,7 @@ final class EmulatorCore: ObservableObject {
            let items = try? FileManager.default.contentsOfDirectory(at: gamesURL, includingPropertiesForKeys: nil) {
             let zips = items.filter { $0.pathExtension.lowercased() == "zip" }
                 .filter { !FileManager.default.fileExists(atPath: gamesURL.appendingPathComponent($0.deletingPathExtension().lastPathComponent).path) }
+                .filter { !failedZips.contains($0.lastPathComponent) }
             if !zips.isEmpty { unzipGames(zips) }
         }
         CemuBridge_RefreshGameList()
@@ -150,6 +151,9 @@ final class EmulatorCore: ObservableObject {
         if FileManager.default.fileExists(atPath: url.path) { return url }
         return CemuBridge_ExtractIcon(game.titleIdValue, url.path) ? url : nil
     }
+
+    /// zips in the games folder that failed to unpack; not retried on every rescan
+    var failedZips = Set<String>()
 
     /// Import progress shown in the library while a zip is unpacked (nil when idle)
     @Published var importProgress: Double?
@@ -206,7 +210,10 @@ final class EmulatorCore: ObservableObject {
                     }
                 } catch {
                     let msg = "Could not unpack \(zip.lastPathComponent): \(error.localizedDescription)"
-                    await MainActor.run { EmulatorCore.shared.errorMessage = msg }
+                    await MainActor.run {
+                        EmulatorCore.shared.errorMessage = msg
+                        EmulatorCore.shared.failedZips.insert(zip.lastPathComponent)
+                    }
                 }
             }
             await MainActor.run {
