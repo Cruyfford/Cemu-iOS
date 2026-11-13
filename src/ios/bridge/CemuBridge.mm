@@ -293,9 +293,21 @@ extern "C" bool CemuBridge_Initialize(const char* documentsDir, const char* cach
 	if (config.tv_device.empty())
 		config.tv_device = L"default";
 	if (firstStart)
-	{
-		config.game_paths.emplace_back(_pathToUtf8(ActiveSettings::GetUserDataPath("games")));
 		config.notification.position = ScreenPosition::kTopLeft;
+	// iOS can move the app's data container (new UUID in the path) when the app is updated or
+	// re-signed, so stored absolute game paths go stale. Drop missing paths and always scan the
+	// current Documents/games folder.
+	{
+		const std::string gamesDir = _pathToUtf8(ActiveSettings::GetUserDataPath("games"));
+		std::vector<std::string> paths;
+		paths.emplace_back(gamesDir);
+		for (auto& p : config.game_paths)
+		{
+			std::error_code pec;
+			if (p != gamesDir && fs::exists(_utf8ToPath(p), pec) && std::find(paths.begin(), paths.end(), p) == paths.end())
+				paths.emplace_back(p);
+		}
+		config.game_paths = paths;
 	}
 	GetConfigHandle().Save();
 
