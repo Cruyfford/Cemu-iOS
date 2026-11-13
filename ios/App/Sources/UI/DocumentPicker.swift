@@ -52,7 +52,8 @@ extension View {
     /// Presents the document picker for `kind` and routes the result to the core.
     func importSheet(_ kind: Binding<ImportKind?>) -> some View {
         sheet(item: kind) { k in
-            DocumentPicker(types: k.types, allowsMultiple: k == .games) { urls in
+            // single selection: tapping a file picks it right away, no "Open" button involved
+            DocumentPicker(types: k.types, allowsMultiple: false) { urls in
                 let core = EmulatorCore.shared
                 switch k {
                 case .games:
