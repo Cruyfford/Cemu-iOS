@@ -472,7 +472,6 @@ struct GameRow: View {
                     .frame(width: 30, height: 30)
             }
             .secondaryButton()
-            .buttonBorderShape(.circle)
         }
         .padding(10)
         .glassSurface(RoundedRectangle(cornerRadius: 22, style: .continuous))
